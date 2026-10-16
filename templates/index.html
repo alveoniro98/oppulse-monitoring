@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Dashboard monitoring server dan service sederhana untuk demonstrasi DevOps.">
+  <title>OpsPulse | Monitoring Dashboard</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1120; --panel:#111b2e; --line:#24324a; --muted:#9aabc5; --text:#eef4ff; --blue:#68a7ff; --green:#48d6a1; --amber:#ffc66d; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(ellipse at top left,#162748 0%,var(--bg) 48%); color:var(--text); font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif; }
+    .wrap { width:min(1120px,calc(100% - 32px)); margin:0 auto; padding:34px 0 40px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:18px; margin-bottom:28px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo { width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#4589ff,#6d64f7);font-size:23px;box-shadow:0 8px 30px #3069db44; }
+    h1 { font-size:23px; margin:0; letter-spacing:-.5px; } .sub { color:var(--muted); margin:3px 0 0; font-size:13px; }
+    .pill { border:1px solid #28694f;background:#103728;color:#7ef0bd;padding:8px 12px;border-radius:999px;font-size:12px;white-space:nowrap; }
+    .hero { padding:24px; border:1px solid var(--line);border-radius:22px;background:linear-gradient(115deg,#152744dd,#111b2eee);margin-bottom:18px;display:flex;justify-content:space-between;gap:20px;align-items:center; }
+    .eyebrow { text-transform:uppercase;letter-spacing:1.6px;color:var(--blue);font-size:11px;font-weight:700; }
+    .hero h2 { font-size:clamp(23px,4vw,34px);letter-spacing:-.9px;margin:7px 0 8px; }
+    .hero p { margin:0;color:var(--muted);max-width:650px; }
+    .refresh { background:#203b63;color:#dceaff;border:1px solid #365783;border-radius:10px;padding:10px 14px;font-weight:650;cursor:pointer; }
+    .grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px; }
+    .card { min-width:0;padding:19px;border:1px solid var(--line);background:#111b2eea;border-radius:17px; }
+    .card-top { display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px;gap:8px; }
+    .ico { width:32px;height:32px;display:grid;place-items:center;background:#1b2d49;border-radius:10px;color:var(--blue);font-size:17px; }
+    .value { font-size:30px;font-weight:750;letter-spacing:-1px;margin:18px 0 10px; }
+    .unit { font-size:14px;color:var(--muted);font-weight:500;letter-spacing:0; }
+    .track { height:6px;border-radius:20px;background:#25334a;overflow:hidden; }
+    .bar { height:100%;width:0;background:linear-gradient(90deg,#4d91ff,#7c83ff);border-radius:20px;transition:width .4s; }
+    .hint { font-size:12px;color:var(--muted);margin-top:9px; }
+    .lower { display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px; }
+    .section-title { font-size:15px;font-weight:700;margin:0 0 16px; }
+    .row { display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid #202d42; }
+    .row:last-child { border:0;padding-bottom:0; } .label { color:var(--muted); }
+    .value-sm { font-weight:650;text-align:right;overflow-wrap:anywhere; }
+    .ok { color:var(--green); } .warning { color:var(--amber); }
+    .foot { display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#7284a1;font-size:12px;margin-top:22px; }
+    @media(max-width:800px){.grid{grid-template-columns:repeat(2,minmax(0,1fr));}.lower{grid-template-columns:1fr}.hero{align-items:flex-start;flex-direction:column}}
+    @media(max-width:430px){.wrap{width:calc(100% - 22px);padding-top:22px}.grid{gap:9px}.card{padding:14px}.value{font-size:25px}header{align-items:flex-start;flex-direction:column}.hero{padding:18px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="logo">⌁</div><div><h1>OpsPulse</h1><p class="sub">Server & Service Monitoring</p></div></div>
+    <div class="pill" id="service-pill">● Connecting to service…</div>
+  </header>
+  <section class="hero">
+    <div><div class="eyebrow">Operations overview</div><h2>Infrastructure at a glance.</h2><p>Dashboard monitoring sederhana untuk memeriksa kesehatan service dan penggunaan resource server secara berkala.</p></div>
+    <button class="refresh" onclick="loadMetrics()">↻ Refresh metrics</button>
+  </section>
+  <section class="grid">
+    <article class="card"><div class="card-top"><span>CPU Usage</span><span class="ico">⌘</span></div><div class="value"><span id="cpu">—</span><span class="unit"> %</span></div><div class="track"><div class="bar" id="cpu-bar"></div></div><div class="hint">Penggunaan CPU saat ini</div></article>
+    <article class="card"><div class="card-top"><span>Memory Usage</span><span class="ico">▤</span></div><div class="value"><span id="memory">—</span><span class="unit"> %</span></div><div class="track"><div class="bar" id="memory-bar"></div></div><div class="hint" id="memory-detail">RAM usage</div></article>
+    <article class="card"><div class="card-top"><span>Disk Usage</span><span class="ico">▣</span></div><div class="value"><span id="disk">—</span><span class="unit"> %</span></div><div class="track"><div class="bar" id="disk-bar"></div></div><div class="hint">Filesystem root (/)</div></article>
+    <article class="card"><div class="card-top"><span>Application Uptime</span><span class="ico">◷</span></div><div class="value" id="uptime">—</div><div class="hint">Waktu sejak backend dimulai</div></article>
+  </section>
+  <section class="lower">
+    <article class="card"><h3 class="section-title">Service information</h3>
+      <div class="row"><span class="label">Health endpoint</span><span class="value-sm ok" id="health-status">Checking…</span></div>
+      <div class="row"><span class="label">Application version</span><span class="value-sm">{{ version }}</span></div>
+      <div class="row"><span class="label">Backend</span><span class="value-sm">Python · Flask</span></div>
+      <div class="row"><span class="label">Container-ready</span><span class="value-sm ok">Docker</span></div>
+    </article>
+    <article class="card"><h3 class="section-title">Latest check</h3>
+      <div class="row"><span class="label">Last updated</span><span class="value-sm" id="updated">—</span></div>
+      <div class="row"><span class="label">Polling interval</span><span class="value-sm">10 seconds</span></div>
+      <div class="row"><span class="label">Data source</span><span class="value-sm">Backend metrics API</span></div>
+      <div class="row"><span class="label">Dashboard status</span><span class="value-sm ok" id="dash-status">Active</span></div>
+    </article>
+  </section>
+  <footer class="foot"><span>OpsPulse · DevOps portfolio demo</span><span>Version {{ version }} · <span id="footer-time">Waiting for data</span></span></footer>
+</div>
+<script>
+const el = id => document.getElementById(id);
+function bar(id, value) { el(id).style.width = Math.max(0, Math.min(100, value)) + '%'; }
+function duration(seconds) {
+  const d = Math.floor(seconds / 86400), h = Math.floor((seconds % 86400) / 3600), m = Math.floor((seconds % 3600) / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+}
+async function loadMetrics() {
+  try {
+    const [healthRes, metricsRes] = await Promise.all([fetch('/health'), fetch('/api/metrics')]);
+    if (!healthRes.ok || !metricsRes.ok) throw new Error('Service response not OK');
+    const health = await healthRes.json(), m = await metricsRes.json();
+    el('service-pill').textContent = '● Service healthy';
+    el('health-status').textContent = health.status.toUpperCase();
+    el('health-status').className = 'value-sm ok';
+    el('cpu').textContent = m.cpu_percent.toFixed(1); bar('cpu-bar', m.cpu_percent);
+    el('memory').textContent = m.memory_percent.toFixed(1); bar('memory-bar', m.memory_percent);
+    el('memory-detail').textContent = `${m.memory_used_mb.toLocaleString()} / ${m.memory_total_mb.toLocaleString()} MB used`;
+    el('disk').textContent = m.disk_percent.toFixed(1); bar('disk-bar', m.disk_percent);
+    el('uptime').textContent = duration(m.app_uptime_seconds);
+    const now = new Date(); el('updated').textContent = now.toLocaleTimeString('id-ID');
+    el('footer-time').textContent = 'Updated ' + now.toLocaleTimeString('id-ID');
+    el('dash-status').textContent = 'Active';
+  } catch (e) {
+    el('service-pill').textContent = '● Service unavailable';
+    el('health-status').textContent = 'UNAVAILABLE'; el('health-status').className = 'value-sm warning';
+    el('dash-status').textContent = 'Check connection';
+  }
+}
+loadMetrics(); setInterval(loadMetrics, 10000);
+</script>
+</body>
+</html>
